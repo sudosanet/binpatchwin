@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="binpatchwin.csproj" />
+  <Project Path="binpatchwin.Tests\binpatchwin.Tests.csproj" />
+</Solution>
