@@ -14,7 +14,25 @@ Windows用バイナリパッチ作成・適用ツール
 
 ## ダウンロード
 
-[Releases](https://github.com/sudosanet/binpatchwin/releases) から最新の `binpatchwin.exe` をダウンロードしてください。
+[Releases](https://github.com/sudosanet/binpatchwin/releases) からダウンロードしてください。
+
+| ファイル | サイズ | 説明 |
+|---------|--------|------|
+| `binpatchwin.exe` | 約200KB | 軽量版（.NET 10 ランタイムが必要） |
+| `binpatchwin-self-contained.exe` | 約110MB | ランタイム同梱版（インストール不要） |
+
+## 動作環境
+
+- Windows 10 / 11 (x64)
+
+### .NET 10 ランタイムのインストール（軽量版を使う場合）
+
+軽量版 (`binpatchwin.exe`) を使用するには .NET 10 デスクトップランタイムが必要です。
+ランタイム同梱版 (`binpatchwin-self-contained.exe`) を使う場合はインストール不要です。
+
+以下のリンクからインストーラーをダウンロードし、実行してください。
+
+[.NET 10 デスクトップランタイム (x64) をダウンロード](https://dotnet.microsoft.com/ja-jp/download/dotnet/thank-you/runtime-desktop-10.0.5-windows-x64-installer)
 
 ## 使い方
 
@@ -64,6 +82,10 @@ dotnet test
 ### 単一ファイル発行
 
 ```bash
+# 軽量版（ランタイム必要）
+dotnet publish binpatchwin.csproj -c Release -r win-x64 --no-self-contained -p:PublishSingleFile=true -o publish
+
+# ランタイム同梱版
 dotnet publish binpatchwin.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
 ```
 
