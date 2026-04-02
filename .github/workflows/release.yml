@@ -36,7 +36,7 @@ jobs:
             echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Setup .NET 10
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
@@ -48,32 +48,12 @@ jobs:
       - name: Test
         run: dotnet test --configuration Release --verbosity minimal
 
-      - name: Publish (self-contained)
-        run: dotnet publish binpatchwin.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish-self-contained
-
-      - name: Publish (framework-dependent)
-        run: dotnet publish binpatchwin.csproj -c Release -r win-x64 --no-self-contained -p:PublishSingleFile=true -o publish-fdd
-
-      - name: Rename artifacts
-        shell: bash
-        run: |
-          mv publish-self-contained/binpatchwin.exe "publish-self-contained/binpatchwin-self-contained.exe"
-          mv publish-fdd/binpatchwin.exe "publish-fdd/binpatchwin.exe"
+      - name: Build
+        run: dotnet build binpatchwin.csproj -c Release -o publish
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          files: |
-            publish-fdd/binpatchwin.exe
-            publish-self-contained/binpatchwin-self-contained.exe
+          files: publish/binpatchwin.exe
           generate_release_notes: true
-          body: |
-            ## ダウンロード
-
-            | ファイル | サイズ | 説明 |
-            |---------|--------|------|
-            | `binpatchwin.exe` | 約200KB | .NET 10 ランタイムが必要（軽量版） |
-            | `binpatchwin-self-contained.exe` | 約110MB | ランタイム同梱版（インストール不要） |
-
-            .NET 10 ランタイムのインストール方法は [README](https://github.com/sudosanet/binpatchwin#動作環境) を参照してください。
