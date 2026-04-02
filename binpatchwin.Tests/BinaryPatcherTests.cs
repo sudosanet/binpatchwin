@@ -1,169 +1,168 @@
+using System;
+using System.IO;
+using System.Linq;
 using Xunit;
 
-namespace binpatchwin.Tests;
-
-public class BinaryPatcherTests : IDisposable
+namespace binpatchwin.Tests
 {
-    private readonly string _tempDir;
-
-    public BinaryPatcherTests()
+    public class BinaryPatcherTests : IDisposable
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"binpatch-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_tempDir);
-    }
+        private readonly string _tempDir;
 
-    public void Dispose()
-    {
-        if (Directory.Exists(_tempDir))
-            Directory.Delete(_tempDir, true);
-    }
+        public BinaryPatcherTests()
+        {
+            _tempDir = Path.Combine(Path.GetTempPath(), string.Format("binpatch-test-{0:N}", Guid.NewGuid()));
+            Directory.CreateDirectory(_tempDir);
+        }
 
-    private void AssertRoundTrip(byte[] original, byte[] modified)
-    {
-        var originalPath = Path.Combine(_tempDir, "original.bin");
-        var modifiedPath = Path.Combine(_tempDir, "modified.bin");
-        var patchPath = Path.Combine(_tempDir, "patch.bpat");
-        var outputPath = Path.Combine(_tempDir, "output.bin");
+        public void Dispose()
+        {
+            if (Directory.Exists(_tempDir))
+                Directory.Delete(_tempDir, true);
+        }
 
-        File.WriteAllBytes(originalPath, original);
-        File.WriteAllBytes(modifiedPath, modified);
+        private void AssertRoundTrip(byte[] original, byte[] modified)
+        {
+            var originalPath = Path.Combine(_tempDir, "original.bin");
+            var modifiedPath = Path.Combine(_tempDir, "modified.bin");
+            var patchPath = Path.Combine(_tempDir, "patch.bpat");
+            var outputPath = Path.Combine(_tempDir, "output.bin");
 
-        // Create patch
-        var patch = BinaryPatcher.CreatePatch(originalPath, modifiedPath);
+            File.WriteAllBytes(originalPath, original);
+            File.WriteAllBytes(modifiedPath, modified);
 
-        // Serialize and deserialize patch (round-trip through file)
-        using (var fs = File.Create(patchPath))
-            patch.WriteTo(fs);
+            var patch = BinaryPatcher.CreatePatch(originalPath, modifiedPath);
 
-        PatchFile loadedPatch;
-        using (var fs = File.OpenRead(patchPath))
-            loadedPatch = PatchFile.ReadFrom(fs);
+            using (var fs = File.Create(patchPath))
+                patch.WriteTo(fs);
 
-        // Apply patch
-        BinaryPatcher.ApplyPatch(originalPath, loadedPatch, outputPath);
+            PatchFile loadedPatch;
+            using (var fs = File.OpenRead(patchPath))
+                loadedPatch = PatchFile.ReadFrom(fs);
 
-        // Verify binary match
-        var result = File.ReadAllBytes(outputPath);
-        Assert.Equal(modified, result);
-    }
+            BinaryPatcher.ApplyPatch(originalPath, loadedPatch, outputPath);
 
-    [Fact]
-    public void RoundTrip_SameSizeWithDifferences()
-    {
-        var rng = new Random(42);
-        var original = new byte[1024];
-        rng.NextBytes(original);
+            var result = File.ReadAllBytes(outputPath);
+            Assert.Equal(modified, result);
+        }
 
-        var modified = (byte[])original.Clone();
-        modified[0] = (byte)(modified[0] ^ 0xFF);
-        modified[100] = (byte)(modified[100] ^ 0xAB);
-        modified[500] = (byte)(modified[500] ^ 0x01);
-        modified[1023] = (byte)(modified[1023] ^ 0x77);
+        [Fact]
+        public void RoundTrip_SameSizeWithDifferences()
+        {
+            var rng = new Random(42);
+            var original = new byte[1024];
+            rng.NextBytes(original);
 
-        AssertRoundTrip(original, modified);
-    }
+            var modified = (byte[])original.Clone();
+            modified[0] = (byte)(modified[0] ^ 0xFF);
+            modified[100] = (byte)(modified[100] ^ 0xAB);
+            modified[500] = (byte)(modified[500] ^ 0x01);
+            modified[1023] = (byte)(modified[1023] ^ 0x77);
 
-    [Fact]
-    public void RoundTrip_ModifiedLonger()
-    {
-        var rng = new Random(100);
-        var original = new byte[512];
-        rng.NextBytes(original);
+            AssertRoundTrip(original, modified);
+        }
 
-        var modified = new byte[1024];
-        rng.NextBytes(modified);
-        Array.Copy(original, modified, 256); // first half shared
+        [Fact]
+        public void RoundTrip_ModifiedLonger()
+        {
+            var rng = new Random(100);
+            var original = new byte[512];
+            rng.NextBytes(original);
 
-        AssertRoundTrip(original, modified);
-    }
+            var modified = new byte[1024];
+            rng.NextBytes(modified);
+            Array.Copy(original, modified, 256);
 
-    [Fact]
-    public void RoundTrip_ModifiedShorter()
-    {
-        var rng = new Random(200);
-        var original = new byte[1024];
-        rng.NextBytes(original);
+            AssertRoundTrip(original, modified);
+        }
 
-        var modified = new byte[512];
-        Array.Copy(original, modified, 512);
-        modified[0] ^= 0xFF;
-        modified[511] ^= 0xFF;
+        [Fact]
+        public void RoundTrip_ModifiedShorter()
+        {
+            var rng = new Random(200);
+            var original = new byte[1024];
+            rng.NextBytes(original);
 
-        AssertRoundTrip(original, modified);
-    }
+            var modified = new byte[512];
+            Array.Copy(original, modified, 512);
+            modified[0] ^= 0xFF;
+            modified[511] ^= 0xFF;
 
-    [Fact]
-    public void RoundTrip_IdenticalFiles()
-    {
-        var rng = new Random(300);
-        var data = new byte[1024];
-        rng.NextBytes(data);
+            AssertRoundTrip(original, modified);
+        }
 
-        var original = (byte[])data.Clone();
-        var modified = (byte[])data.Clone();
+        [Fact]
+        public void RoundTrip_IdenticalFiles()
+        {
+            var rng = new Random(300);
+            var data = new byte[1024];
+            rng.NextBytes(data);
 
-        var originalPath = Path.Combine(_tempDir, "original.bin");
-        var modifiedPath = Path.Combine(_tempDir, "modified.bin");
-        File.WriteAllBytes(originalPath, original);
-        File.WriteAllBytes(modifiedPath, modified);
+            var original = (byte[])data.Clone();
+            var modified = (byte[])data.Clone();
 
-        var patch = BinaryPatcher.CreatePatch(originalPath, modifiedPath);
-        Assert.Empty(patch.Records);
+            var originalPath = Path.Combine(_tempDir, "original.bin");
+            var modifiedPath = Path.Combine(_tempDir, "modified.bin");
+            File.WriteAllBytes(originalPath, original);
+            File.WriteAllBytes(modifiedPath, modified);
 
-        AssertRoundTrip(original, modified);
-    }
+            var patch = BinaryPatcher.CreatePatch(originalPath, modifiedPath);
+            Assert.Empty(patch.Records);
 
-    [Fact]
-    public void RoundTrip_CompletelyDifferent()
-    {
-        var rng1 = new Random(400);
-        var rng2 = new Random(500);
-        var original = new byte[1024];
-        var modified = new byte[1024];
-        rng1.NextBytes(original);
-        rng2.NextBytes(modified);
+            AssertRoundTrip(original, modified);
+        }
 
-        AssertRoundTrip(original, modified);
-    }
+        [Fact]
+        public void RoundTrip_CompletelyDifferent()
+        {
+            var rng1 = new Random(400);
+            var rng2 = new Random(500);
+            var original = new byte[1024];
+            var modified = new byte[1024];
+            rng1.NextBytes(original);
+            rng2.NextBytes(modified);
 
-    [Fact]
-    public void RoundTrip_LargeFile()
-    {
-        var rng = new Random(600);
-        var original = new byte[1024 * 1024]; // 1MB
-        rng.NextBytes(original);
+            AssertRoundTrip(original, modified);
+        }
 
-        var modified = (byte[])original.Clone();
-        // Scatter differences
-        for (int i = 0; i < modified.Length; i += 4096)
-            modified[i] ^= 0xFF;
+        [Fact]
+        public void RoundTrip_LargeFile()
+        {
+            var rng = new Random(600);
+            var original = new byte[1024 * 1024];
+            rng.NextBytes(original);
 
-        AssertRoundTrip(original, modified);
-    }
+            var modified = (byte[])original.Clone();
+            for (int i = 0; i < modified.Length; i += 4096)
+                modified[i] ^= 0xFF;
 
-    [Fact]
-    public void ApplyPatch_WrongOriginal_ThrowsException()
-    {
-        var rng = new Random(700);
-        var original = new byte[512];
-        var modified = new byte[512];
-        var wrongFile = new byte[512];
-        rng.NextBytes(original);
-        rng.NextBytes(modified);
-        rng.NextBytes(wrongFile);
+            AssertRoundTrip(original, modified);
+        }
 
-        var originalPath = Path.Combine(_tempDir, "original.bin");
-        var modifiedPath = Path.Combine(_tempDir, "modified.bin");
-        var wrongPath = Path.Combine(_tempDir, "wrong.bin");
-        var outputPath = Path.Combine(_tempDir, "output.bin");
+        [Fact]
+        public void ApplyPatch_WrongOriginal_ThrowsException()
+        {
+            var rng = new Random(700);
+            var original = new byte[512];
+            var modified = new byte[512];
+            var wrongFile = new byte[512];
+            rng.NextBytes(original);
+            rng.NextBytes(modified);
+            rng.NextBytes(wrongFile);
 
-        File.WriteAllBytes(originalPath, original);
-        File.WriteAllBytes(modifiedPath, modified);
-        File.WriteAllBytes(wrongPath, wrongFile);
+            var originalPath = Path.Combine(_tempDir, "original.bin");
+            var modifiedPath = Path.Combine(_tempDir, "modified.bin");
+            var wrongPath = Path.Combine(_tempDir, "wrong.bin");
+            var outputPath = Path.Combine(_tempDir, "output.bin");
 
-        var patch = BinaryPatcher.CreatePatch(originalPath, modifiedPath);
+            File.WriteAllBytes(originalPath, original);
+            File.WriteAllBytes(modifiedPath, modified);
+            File.WriteAllBytes(wrongPath, wrongFile);
 
-        Assert.Throws<InvalidOperationException>(() =>
-            BinaryPatcher.ApplyPatch(wrongPath, patch, outputPath));
+            var patch = BinaryPatcher.CreatePatch(originalPath, modifiedPath);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                BinaryPatcher.ApplyPatch(wrongPath, patch, outputPath));
+        }
     }
 }

@@ -1,7 +1,8 @@
-namespace binpatchwin;
-
-public sealed class DeltaRecord
+namespace binpatchwin
 {
-    public long Offset { get; init; }
-    public byte[] Data { get; init; } = [];
+    public sealed class DeltaRecord
+    {
+        public long Offset { get; set; }
+        public byte[] Data { get; set; } = new byte[0];
+    }
 }
